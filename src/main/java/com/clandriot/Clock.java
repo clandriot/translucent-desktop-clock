@@ -1,6 +1,7 @@
 package com.clandriot;
 
 import com.clandriot.component.*;
+import com.clandriot.exchange.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.text.*;
@@ -26,7 +27,9 @@ public class Clock {
   ShadowLabel foreignTime = new ShadowLabel("Petitinho", 30, foreground, alpha, 2, 3);
 
   public static void main(String[] args) {
-      new Clock();
+    MailScan mailscan = new MailScan();
+    System.out.println("Unread msgs = " + mailscan.getUnreadMessageCount());
+    //new Clock();
   }
 
   public Clock() {
