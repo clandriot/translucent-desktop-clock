@@ -26,22 +26,10 @@ public class Clock {
   ShadowLabel date = new ShadowLabel("Calibri",14, foreground, alpha, 1, 1);
   ShadowLabel msg = new ShadowLabel("Calibri",14, foreground, alpha, 1, 1);
   ShadowLabel foreignTime = new ShadowLabel("Petitinho", 30, foreground, alpha, 2, 3);
+  Thread mailScanTh = null;
 
   public static void main(String[] args) {
-    try {
-      MailScan mailScan = new MailScan();
-      mailScan.addMessageCountUpdateListener(new MessageCountUpdateListener() {
-        public void messageAdded() {
-          System.out.println("++");
-        }
-        public void messageRemoved() {
-          System.out.println("--");
-        }
-      });
-    }
-    catch (Exception ex) {
-      ex.printStackTrace();
-    }
+    Clock clock = new Clock();
   }
 
   public Clock() {
@@ -67,7 +55,7 @@ public class Clock {
         date.setText(getDate());
         foreignTime.setText(getForeignTime());
         msg.setHorizontalAlignment(JLabel.CENTER);
-        msg.setText("for later...");
+        msg.setText("loading...");
 
         pane.add(localTime,BorderLayout.PAGE_START);
         pane.add(day,BorderLayout.LINE_START);
@@ -87,6 +75,7 @@ public class Clock {
               moveFrame( frame );
             }
             else if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
+              mailScanTh.interrupt();
               SwingUtilities.getWindowAncestor(e.getComponent()).dispose();
             }
           }
@@ -115,6 +104,19 @@ public class Clock {
         new Timer(1000,refresh).start();
       }
     });
+
+    startMailScanner();
+  }
+
+  public void updateMsgCount(int unreadMsgs, int nbMsgs) {
+    String txt = Integer.toString(unreadMsgs);
+    if (nbMsgs > 0) {
+      txt += " / +" + Integer.toString(nbMsgs);
+    }
+    else {
+      txt += " / -";
+    }
+    msg.setText(txt);
   }
 
 	public void moveFrame(JWindow frame) {
@@ -145,4 +147,23 @@ public class Clock {
 		SimpleDateFormat sdf = new SimpleDateFormat("d MMM");
 		return sdf.format(cal.getTime());
 	}
+
+  private void startMailScanner() {
+    try {
+      MailScan mailScan = new MailScan();
+      mailScan.addMessageCountUpdateListener(new MessageCountUpdateListener() {
+        public void messageAdded(int nbUnreadMessageCount) {
+          updateMsgCount(nbUnreadMessageCount, 1);
+        }
+        public void messageRemoved(int nbUnreadMessageCount) {
+          updateMsgCount(nbUnreadMessageCount, -1);
+        }
+      });
+      mailScanTh = new Thread(mailScan);
+      mailScanTh.start();
+    }
+    catch (Exception ex) {
+      ex.printStackTrace();
+    }
+  }
 }

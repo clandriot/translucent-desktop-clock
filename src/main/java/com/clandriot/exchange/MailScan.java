@@ -4,14 +4,18 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.lang.*;
 
+import java.awt.event.*;
+
 import javax.mail.*;
 import javax.mail.event.*;
+import javax.swing.Timer;
 
 import com.sun.mail.imap.*;
 
 import com.clandriot.exchange.events.*;
+import com.clandriot.exchange.exception.*;
 
-public class MailScan implements MessageCountListener {
+public class MailScan implements MessageCountListener, Runnable {
   private String host = "outlook.office365.com";
   private String user = System.getenv("MAIL_USER");
   private String password = System.getenv("MAIL_PWD");
@@ -21,8 +25,7 @@ public class MailScan implements MessageCountListener {
 	private ExecutorService es = Executors.newCachedThreadPool();
   private List<MessageCountUpdateListener> listeners = new ArrayList<MessageCountUpdateListener>();
 
-  public MailScan() throws Exception {
-    startScan();
+  public MailScan() {
   }
 
   public int getUnreadMessageCount() throws NoSuchProviderException, AuthenticationFailedException, MessagingException, IllegalStateException, FolderNotFoundException {
@@ -40,12 +43,23 @@ public class MailScan implements MessageCountListener {
   }
 
   @Override
-  public void messagesAdded(MessageCountEvent evt) {
-    Folder folder = (Folder)evt.getSource();
-    for (MessageCountUpdateListener lstn : listeners) {
-      lstn.messageAdded();
-    }
+  public void run() {
     try {
+      startScan();
+    }
+    catch (MailScanException ex) {
+      ex.printStackTrace();
+    }
+    checkInterrupt(Thread.currentThread());
+  }
+
+  @Override
+  public void messagesAdded(MessageCountEvent evt) {
+    try {
+      Folder folder = (Folder)evt.getSource();
+      for (MessageCountUpdateListener lstn : listeners) {
+        lstn.messageAdded(folder.getUnreadMessageCount());
+      }
       idleManager.watch(folder);
     }
     catch (MessagingException ex) {
@@ -55,11 +69,11 @@ public class MailScan implements MessageCountListener {
 
   @Override
   public void messagesRemoved(MessageCountEvent evt) {
-    Folder folder = (Folder)evt.getSource();
-    for (MessageCountUpdateListener lstn : listeners) {
-      lstn.messageRemoved();
-    }
     try {
+      Folder folder = (Folder)evt.getSource();
+      for (MessageCountUpdateListener lstn : listeners) {
+        lstn.messageRemoved(getUnreadMessageCount());
+      }
       idleManager.watch(folder);
     }
     catch (MessagingException ex) {
@@ -67,17 +81,34 @@ public class MailScan implements MessageCountListener {
     }
   }
 
-  private void startScan() throws Exception {
+  private void startScan() throws MailScanException {
     try {
       Folder inbox = getStore().getFolder("Inbox");
-      inbox.open(Folder.READ_WRITE);
+      inbox.open(Folder.READ_ONLY);
       this.idleManager = new IdleManager(getSession(), es);
       inbox.addMessageCountListener(this);
       idleManager.watch(inbox);
     }
     catch (Exception ex) {
       ex.printStackTrace();
-      throw new Exception(ex);
+      throw new MailScanException(ex);
+    }
+  }
+
+  private void stopScan() {
+    idleManager.stop();
+    es.shutdownNow();
+  }
+
+  private void checkInterrupt(Thread th) {
+    while (true) {
+      try {
+        Thread.sleep(500);
+      }
+      catch (InterruptedException ex) {
+          stopScan();
+          return;
+      }
     }
   }
 
