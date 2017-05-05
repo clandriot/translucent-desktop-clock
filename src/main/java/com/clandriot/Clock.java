@@ -106,6 +106,13 @@ public class Clock {
     });
 
     startMailScanner();
+    MailScan mailScan = new MailScan();
+    try {
+      updateMsgCount(mailScan.getUnreadMessageCount(), 0);
+    }
+    catch (Exception ex) {
+      System.out.println(ex);
+    }
   }
 
   public void updateMsgCount(int unreadMsgs, int nbMsgs) {
