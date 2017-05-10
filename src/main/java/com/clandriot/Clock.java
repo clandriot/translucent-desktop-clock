@@ -27,6 +27,7 @@ public class Clock {
   ShadowLabel msg = new ShadowLabel("Calibri",14, foreground, alpha, 1, 1);
   ShadowLabel foreignTime = new ShadowLabel("Petitinho", 30, foreground, alpha, 2, 3);
   Thread mailScanTh = null;
+  int msgAdded = 0;
 
   public static void main(String[] args) {
     Clock clock = new Clock();
@@ -160,9 +161,11 @@ public class Clock {
       MailScan mailScan = new MailScan();
       mailScan.addMessageCountUpdateListener(new MessageCountUpdateListener() {
         public void messageAdded(int nbUnreadMessageCount) {
-          updateMsgCount(nbUnreadMessageCount, 1);
+          msgAdded++;
+          updateMsgCount(nbUnreadMessageCount, msgAdded);
         }
         public void messageRemoved(int nbUnreadMessageCount) {
+          msgAdded = 0;
           updateMsgCount(nbUnreadMessageCount, -1);
         }
       });

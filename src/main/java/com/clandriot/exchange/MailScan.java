@@ -24,6 +24,7 @@ public class MailScan implements MessageCountListener, Runnable {
   private IdleManager idleManager = null;
 	private ExecutorService es = Executors.newCachedThreadPool();
   private List<MessageCountUpdateListener> listeners = new ArrayList<MessageCountUpdateListener>();
+  private ScheduledExecutorService keepAliveExecutor = Executors.newSingleThreadScheduledExecutor();
 
   public MailScan() {
   }
@@ -60,6 +61,7 @@ public class MailScan implements MessageCountListener, Runnable {
       for (MessageCountUpdateListener lstn : listeners) {
         lstn.messageAdded(folder.getUnreadMessageCount());
       }
+      checkFolder(folder);
       idleManager.watch(folder);
     }
     catch (MessagingException ex) {
@@ -74,6 +76,7 @@ public class MailScan implements MessageCountListener, Runnable {
       for (MessageCountUpdateListener lstn : listeners) {
         lstn.messageRemoved(getUnreadMessageCount());
       }
+      checkFolder(folder);
       idleManager.watch(folder);
     }
     catch (MessagingException ex) {
@@ -87,7 +90,7 @@ public class MailScan implements MessageCountListener, Runnable {
       inbox.open(Folder.READ_ONLY);
       this.idleManager = new IdleManager(getSession(), es);
       inbox.addMessageCountListener(this);
-      idleManager.watch(inbox);
+      keepAlive(inbox, this.idleManager);
     }
     catch (Exception ex) {
       ex.printStackTrace();
@@ -95,9 +98,27 @@ public class MailScan implements MessageCountListener, Runnable {
     }
   }
 
+  private void keepAlive(Folder folder, IdleManager idle) {
+    Runnable keepAlive = new Runnable() {
+      @Override
+      public void run() {
+        try {
+          System.out.println("Refreshing idle manager");
+          checkFolder(folder);
+          idle.watch(folder);
+        }
+        catch (Exception ex) {
+          ex.printStackTrace();
+        }
+      }
+    };
+    keepAliveExecutor.scheduleAtFixedRate(keepAlive, 0, 1, TimeUnit.MINUTES);
+  }
+
   private void stopScan() {
     idleManager.stop();
     es.shutdownNow();
+    keepAliveExecutor.shutdownNow();
   }
 
   private void checkInterrupt(Thread th) {
@@ -108,6 +129,18 @@ public class MailScan implements MessageCountListener, Runnable {
       catch (InterruptedException ex) {
           stopScan();
           return;
+      }
+    }
+  }
+
+  private void checkFolder(Folder folder) {
+    if (!folder.isOpen()) {
+      System.out.println("Folder closed, reopening it");
+      try {
+        folder.open(Folder.READ_ONLY);
+      }
+      catch(Exception ex) {
+        ex.printStackTrace();
       }
     }
   }
