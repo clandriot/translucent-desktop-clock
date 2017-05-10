@@ -6,7 +6,6 @@ repositories {
 }
 
 dependencies {
-    compile 'com.microsoft.ews-java-api:ews-java-api:2.0'
     compile group: 'com.sun.mail', name: 'javax.mail', version: '1.6.0-rc1'
 }
 
