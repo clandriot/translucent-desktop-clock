@@ -12,6 +12,8 @@ import javax.swing.Timer;
 
 import com.sun.mail.imap.*;
 
+import com.sun.mail.util.MailConnectException;
+
 import com.clandriot.exchange.events.*;
 import com.clandriot.exchange.exception.*;
 
@@ -159,9 +161,16 @@ public class MailScan implements MessageCountListener, Runnable {
   private Store getStore() throws NoSuchProviderException, AuthenticationFailedException, MessagingException, IllegalStateException {
     if (store == null) {
         store = getSession().getStore("imaps");
-        store.connect(host, user, password);
-    } else if (!store.isConnected()) {
-      store.connect(host, user, password);
+    }
+    if (!store.isConnected()) {
+      do {
+        try {
+          store.connect(host, user, password);
+        }
+        catch (MailConnectException ex) {
+          System.out.println("Aitch, probably timeout. Trying again");
+        }
+      } while (!store.isConnected());
     }
 
     return store;
